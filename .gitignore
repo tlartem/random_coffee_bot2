@@ -1,0 +1,28 @@
+# Исключаем временные файлы и кэш Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Исключаем логи
+*.log
+
+# Исключаем файлы конфигурации с секретами
+config.yaml
+
+# Исключаем скомпилированные файлы
+*.egg-info/
+dist/
+build/
+
+# Исключаем IDE-специфичные файлы
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Исключаем операционные файлы
+.env
+.env.local
+
+random_coffee.db
