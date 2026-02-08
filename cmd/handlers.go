@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -58,6 +61,54 @@ func getWeekStart(t time.Time) string {
 		offset += 7
 	}
 	return t.AddDate(0, 0, -offset).Format("2006-01-02")
+}
+
+// sendPollNonAnonymous sends a non-anonymous poll by manually constructing the request
+// Workaround for echotron bug where IsAnonymous=false is ignored (bool false is zero value)
+func sendPollNonAnonymous(chatID int64, question string, options []echotron.InputPollOption, opts *echotron.PollOptions) (*echotron.APIResponseMessage, error) {
+	token := os.Getenv("TELEGRAM__TOKEN")
+	if token == "" {
+		return nil, fmt.Errorf("TELEGRAM__TOKEN not set")
+	}
+
+	baseURL := "https://api.telegram.org/bot" + token + "/sendPoll"
+
+	vals := make(url.Values)
+	vals.Set("chat_id", strconv.FormatInt(chatID, 10))
+	vals.Set("question", question)
+
+	optionsJSON, err := json.Marshal(options)
+	if err != nil {
+		return nil, err
+	}
+	vals.Set("options", string(optionsJSON))
+
+	// IMPORTANT: Explicitly set is_anonymous=false to get poll_answer updates
+	// echotron ignores IsAnonymous=false because bool false is zero value in scan()
+	vals.Set("is_anonymous", "false")
+
+	if opts != nil && opts.AllowsMultipleAnswers {
+		vals.Set("allows_multiple_answers", "true")
+	}
+
+	// Make the HTTP request
+	resp, err := http.PostForm(baseURL, vals)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Parse response
+	var result echotron.APIResponseMessage
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !result.Ok {
+		return nil, fmt.Errorf("telegram API error: %s", result.Description)
+	}
+
+	return &result, nil
 }
 
 func parseCommaSeparatedIDs(envKey, fieldName string) []int64 {
@@ -221,12 +272,14 @@ func SendQuiz(ctx context.Context, db *sql.DB, api echotron.API, groupID int64) 
 		{Text: "Да!"},
 		{Text: "Нет"},
 	}
+
+	// Workaround for echotron bug: IsAnonymous=false is ignored because bool false is zero value
+	// We need to explicitly set is_anonymous=false in the request
 	opts := &echotron.PollOptions{
-		IsAnonymous:           false,
 		AllowsMultipleAnswers: false,
 	}
 
-	result, err := api.SendPoll(groupID, question, options, opts)
+	result, err := sendPollNonAnonymous(groupID, question, options, opts)
 	if err != nil {
 		log.Error().Err(err).Int64("group_id", groupID).Msg("SendPoll failed")
 		return

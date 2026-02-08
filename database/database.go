@@ -58,10 +58,17 @@ func GetAllParticipants(ctx context.Context, db *sql.DB, groupID int64) ([]Parti
 	participants := make([]Participant, 0)
 	for rows.Next() {
 		var p Participant
-		var idStr string
-		if err := rows.Scan(&idStr, &p.GroupID, &p.UserID, &p.Username, &p.FullName, &p.CreatedAt); err != nil {
+		var idStr, createdAtStr string
+		if err := rows.Scan(&idStr, &p.GroupID, &p.UserID, &p.Username, &p.FullName, &createdAtStr); err != nil {
 			return nil, err
 		}
+
+		// Parse time string - SQLite returns timestamps as strings
+		p.CreatedAt, _ = time.Parse(time.RFC3339, createdAtStr)
+		if p.CreatedAt.IsZero() {
+			p.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAtStr)
+		}
+
 		p.ID, _ = uuid.Parse(idStr)
 		participants = append(participants, p)
 	}
@@ -131,13 +138,25 @@ func GetAvailablePairs(ctx context.Context, db *sql.DB, groupID int64) ([][2]Par
 	for rows.Next() {
 		var p1, p2 Participant
 		var p1IDStr, p2IDStr string
+		var p1CreatedAtStr, p2CreatedAtStr string
 		p1.GroupID = groupID
 		p2.GroupID = groupID
 
-		if err := rows.Scan(&p1IDStr, &p1.UserID, &p1.Username, &p1.FullName, &p1.CreatedAt,
-			&p2IDStr, &p2.UserID, &p2.Username, &p2.FullName, &p2.CreatedAt); err != nil {
+		if err := rows.Scan(&p1IDStr, &p1.UserID, &p1.Username, &p1.FullName, &p1CreatedAtStr,
+			&p2IDStr, &p2.UserID, &p2.Username, &p2.FullName, &p2CreatedAtStr); err != nil {
 			return nil, err
 		}
+
+		// Parse time strings - SQLite returns timestamps as strings
+		p1.CreatedAt, _ = time.Parse(time.RFC3339, p1CreatedAtStr)
+		if p1.CreatedAt.IsZero() {
+			p1.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", p1CreatedAtStr)
+		}
+		p2.CreatedAt, _ = time.Parse(time.RFC3339, p2CreatedAtStr)
+		if p2.CreatedAt.IsZero() {
+			p2.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", p2CreatedAtStr)
+		}
+
 		p1.ID, _ = uuid.Parse(p1IDStr)
 		p2.ID, _ = uuid.Parse(p2IDStr)
 		pairs = append(pairs, [2]Participant{p1, p2})

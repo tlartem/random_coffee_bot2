@@ -117,11 +117,11 @@ func main() {
 	dsp := echotron.NewDispatcher(botToken, newBot)
 
 	updateOpts := echotron.UpdateOptions{
-		AllowedUpdates: []echotron.UpdateType{
-			echotron.MessageUpdate,
-			echotron.CallbackQueryUpdate,
-			echotron.PollAnswerUpdate,
-		},
+		// AllowedUpdates: []echotron.UpdateType{
+		// 	echotron.MessageUpdate,
+		// 	echotron.CallbackQueryUpdate,
+		// 	echotron.PollAnswerUpdate,
+		// },
 	}
 
 	errChan := make(chan error, 1)
