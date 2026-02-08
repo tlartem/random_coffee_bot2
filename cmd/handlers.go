@@ -96,15 +96,20 @@ func getConfiguredGroups() []int64 {
 // HandlePollAnswer processes poll responses
 func HandlePollAnswer(ctx context.Context, db *sql.DB, api echotron.API, pollAnswer *echotron.PollAnswer) {
 	if pollAnswer.User == nil {
+		log.Warn().Msg("PollAnswer with nil User received")
 		return
 	}
+
+	// Log every poll answer for debugging
+	log.Info().Str("poll_id", pollAnswer.PollID).Int64("user_id", pollAnswer.User.ID).Str("username", pollAnswer.User.Username).
+		Interface("option_ids", pollAnswer.OptionIDs).Msg("Poll answer received")
 
 	// Try to find the poll in our database
 	groupID, err := database.GetGroupIDByPollID(ctx, db, pollAnswer.PollID)
 	if err != nil {
 		// Poll not found - this is OK, it might be an old poll that was already processed
 		// Don't spam logs with errors for old polls
-		log.Debug().Str("poll_id", pollAnswer.PollID).Msg("Poll not found (probably old poll)")
+		log.Warn().Err(err).Str("poll_id", pollAnswer.PollID).Msg("Poll not found in database")
 		return
 	}
 
